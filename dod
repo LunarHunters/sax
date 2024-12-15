@@ -1,0 +1,71 @@
+import requests
+import time
+import json
+
+# Configuration for RPC connection
+RPC_URL = "http://yourrpcuser:yourrpcpassword@127.0.0.1:8332"  # Replace with your RPC URL
+HEADERS = {'content-type': 'application/json'}
+
+# Define the JSON-RPC request template
+def rpc_request(method, params=None):
+    payload = {
+        "jsonrpc": "1.0",
+        "id": "python",
+        "method": method,
+        "params": params or []
+    }
+    response = requests.post(RPC_URL, data=json.dumps(payload), headers=HEADERS)
+    return response.json()
+
+# Fetch mempool transaction IDs
+def get_mempool():
+    try:
+        response = rpc_request("getrawmempool")
+        if 'result' in response:
+            return response['result']
+        else:
+            print(f"Error fetching mempool: {response}")
+            return []
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return []
+
+# Fetch detailed information about a transaction
+def get_transaction(txid):
+    try:
+        response = rpc_request("getrawtransaction", [txid, True])
+        if 'result' in response:
+            return response['result']
+        else:
+            print(f"Error fetching transaction {txid}: {response}")
+            return None
+    except Exception as e:
+        print(f"Error fetching transaction {txid}: {str(e)}")
+        return None
+
+# Monitor the mempool for new transactions
+def monitor_mempool():
+    known_txids = set()
+
+    while True:
+        print("Checking for new transactions in mempool...")
+        txids = get_mempool()
+
+        # Filter out new transactions
+        new_txids = [txid for txid in txids if txid not in known_txids]
+        
+        if new_txids:
+            print(f"Found {len(new_txids)} new transaction(s) in mempool.")
+            for txid in new_txids:
+                tx = get_transaction(txid)
+                if tx:
+                    print(f"New transaction details: {json.dumps(tx, indent=2)}")
+
+            # Update the known transactions
+            known_txids.update(new_txids)
+        
+        # Sleep for a while before checking again
+        time.sleep(5)
+
+if __name__ == "__main__":
+    monitor_mempool()
